@@ -13,9 +13,13 @@
 
 static const char *TAG = "llm";
 
-static char s_api_key[128] = {0};
-static char s_model[64] = MIMI_LLM_DEFAULT_MODEL;
-static char s_provider[16] = MIMI_LLM_PROVIDER_DEFAULT;
+#define LLM_API_KEY_MAX_LEN 256
+#define LLM_MODEL_MAX_LEN   64
+#define LLM_PROVIDER_MAX_LEN 16
+
+static char s_api_key[LLM_API_KEY_MAX_LEN] = {0};
+static char s_model[LLM_MODEL_MAX_LEN] = MIMI_LLM_DEFAULT_MODEL;
+static char s_provider[LLM_PROVIDER_MAX_LEN] = MIMI_LLM_PROVIDER_DEFAULT;
 
 static void safe_copy(char *dst, size_t dst_size, const char *src)
 {
@@ -118,20 +122,23 @@ esp_err_t llm_proxy_init(void)
     /* NVS overrides take highest priority (set via CLI) */
     nvs_handle_t nvs;
     if (nvs_open(MIMI_NVS_LLM, NVS_READONLY, &nvs) == ESP_OK) {
-        char tmp[128] = {0};
+        char tmp[LLM_API_KEY_MAX_LEN] = {0};
         size_t len = sizeof(tmp);
         if (nvs_get_str(nvs, MIMI_NVS_KEY_API_KEY, tmp, &len) == ESP_OK && tmp[0]) {
             safe_copy(s_api_key, sizeof(s_api_key), tmp);
         }
-        len = sizeof(tmp);
-        memset(tmp, 0, sizeof(tmp));
-        if (nvs_get_str(nvs, MIMI_NVS_KEY_MODEL, tmp, &len) == ESP_OK && tmp[0]) {
-            safe_copy(s_model, sizeof(s_model), tmp);
         }
-        len = sizeof(tmp);
-        memset(tmp, 0, sizeof(tmp));
-        if (nvs_get_str(nvs, MIMI_NVS_KEY_PROVIDER, tmp, &len) == ESP_OK && tmp[0]) {
-            safe_copy(s_provider, sizeof(s_provider), tmp);
+
+        char model_tmp[LLM_MODEL_MAX_LEN] = {0};
+        len = sizeof(model_tmp);
+        if (nvs_get_str(nvs, MIMI_NVS_KEY_MODEL, model_tmp, &len) == ESP_OK && model_tmp[0]) {
+            safe_copy(s_model, sizeof(s_model), model_tmp);
+        }
+
+        char provider_tmp[LLM_PROVIDER_MAX_LEN] = {0};
+        len = sizeof(provider_tmp);
+        if (nvs_get_str(nvs, MIMI_NVS_KEY_PROVIDER, provider_tmp, &len) == ESP_OK && provider_tmp[0]) {
+            safe_copy(s_provider, sizeof(s_provider), provider_tmp);
         }
         nvs_close(nvs);
     }

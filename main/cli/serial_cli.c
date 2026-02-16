@@ -7,6 +7,9 @@
 #include "memory/session_mgr.h"
 #include "proxy/http_proxy.h"
 #include "tools/tool_web_search.h"
+#include "tools/tool_registry.h"
+#include "cron/cron_service.h"
+#include "heartbeat/heartbeat.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -316,6 +319,54 @@ static int cmd_config_reset(int argc, char **argv)
     return 0;
 }
 
+/* --- heartbeat_trigger command --- */
+static int cmd_heartbeat_trigger(int argc, char **argv)
+{
+    printf("Checking HEARTBEAT.md...\n");
+    if (heartbeat_trigger()) {
+        printf("Heartbeat: agent prompted with pending tasks.\n");
+    } else {
+        printf("Heartbeat: no actionable tasks found.\n");
+    }
+    return 0;
+}
+
+/* --- cron_start command --- */
+static int cmd_cron_start(int argc, char **argv)
+{
+    esp_err_t err = cron_service_start();
+    if (err == ESP_OK) {
+        printf("Cron service started.\n");
+        return 0;
+    }
+
+    printf("Failed to start cron service: %s\n", esp_err_to_name(err));
+    return 1;
+}
+
+static int cmd_tool_exec(int argc, char **argv)
+{
+    if (argc < 2) {
+        printf("Usage: tool_exec <name> [json]\n");
+        return 1;
+    }
+
+    const char *tool_name = argv[1];
+    const char *input_json = (argc >= 3) ? argv[2] : "{}";
+
+    char *output = calloc(1, 4096);
+    if (!output) {
+        printf("Out of memory.\n");
+        return 1;
+    }
+
+    esp_err_t err = tool_registry_execute(tool_name, input_json, output, 4096);
+    printf("tool_exec status: %s\n", esp_err_to_name(err));
+    printf("%s\n", output[0] ? output : "(empty)");
+    free(output);
+    return (err == ESP_OK) ? 0 : 1;
+}
+
 /* --- restart command --- */
 static int cmd_restart(int argc, char **argv)
 {
@@ -504,6 +555,30 @@ esp_err_t serial_cli_init(void)
         .func = &cmd_config_reset,
     };
     esp_console_cmd_register(&config_reset_cmd);
+
+    /* heartbeat_trigger */
+    esp_console_cmd_t heartbeat_cmd = {
+        .command = "heartbeat_trigger",
+        .help = "Manually trigger a heartbeat check",
+        .func = &cmd_heartbeat_trigger,
+    };
+    esp_console_cmd_register(&heartbeat_cmd);
+
+    /* cron_start */
+    esp_console_cmd_t cron_start_cmd = {
+        .command = "cron_start",
+        .help = "Start cron scheduler timer now",
+        .func = &cmd_cron_start,
+    };
+    esp_console_cmd_register(&cron_start_cmd);
+
+    /* tool_exec */
+    esp_console_cmd_t tool_exec_cmd = {
+        .command = "tool_exec",
+        .help = "Execute a registered tool: tool_exec <name> '{...json...}'",
+        .func = &cmd_tool_exec,
+    };
+    esp_console_cmd_register(&tool_exec_cmd);
 
     /* restart */
     esp_console_cmd_t restart_cmd = {
