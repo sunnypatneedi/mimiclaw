@@ -10,11 +10,16 @@
 #define MIMI_CHAN_CLI        "cli"
 #define MIMI_CHAN_SYSTEM     "system"
 
+/* Session type identifiers */
+#define MIMI_SESSION_CASUAL   0
+#define MIMI_SESSION_TUTORING 1
+
 /* Message types on the bus */
 typedef struct {
     char channel[16];       /* "telegram", "websocket", "cli" */
     char chat_id[32];       /* Telegram chat_id or WS client id */
     char *content;          /* Heap-allocated message text (caller must free) */
+    uint8_t session_type;   /* MIMI_SESSION_CASUAL or MIMI_SESSION_TUTORING */
 } mimi_msg_t;
 
 /**

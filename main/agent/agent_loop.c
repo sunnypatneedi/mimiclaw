@@ -8,6 +8,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -16,7 +17,7 @@
 
 static const char *TAG = "agent";
 
-#define TOOL_OUTPUT_SIZE  (8 * 1024)
+#define TOOL_OUTPUT_SIZE  (10 * 1024)
 
 /* Build the assistant content array from llm_response_t for the messages history.
  * Returns a cJSON array with text and tool_use blocks. */
@@ -192,8 +193,29 @@ static void agent_loop_task(void *arg)
 
         ESP_LOGI(TAG, "Processing message from %s:%s", msg.channel, msg.chat_id);
 
-        /* 1. Build system prompt */
-        context_build_system_prompt(system_prompt, MIMI_CONTEXT_BUF_SIZE);
+        /* 1. Build system prompt (with optional skill injection for tutoring).
+         *    Tutoring mode is detected by the presence of a .skill file for this
+         *    session. The LLM can activate tutoring by writing the active skill
+         *    path to /spiffs/sessions/<chat_id>.skill via write_file. */
+        {
+            char skill_path[96] = {0};
+            char meta_path[64];
+            snprintf(meta_path, sizeof(meta_path), "%s/%s.skill",
+                     MIMI_SPIFFS_SESSION_DIR, msg.chat_id);
+            FILE *f = fopen(meta_path, "r");
+            if (f) {
+                if (fgets(skill_path, sizeof(skill_path), f)) {
+                    char *nl = strchr(skill_path, '\n');
+                    if (nl) *nl = '\0';
+                }
+                fclose(f);
+                ESP_LOGI(TAG, "Active skill for session: %s", skill_path);
+            }
+            uint8_t stype = skill_path[0] ? MIMI_SESSION_TUTORING : MIMI_SESSION_CASUAL;
+            context_build_system_prompt_ex(system_prompt, MIMI_CONTEXT_BUF_SIZE,
+                                            stype,
+                                            skill_path[0] ? skill_path : NULL);
+        }
         append_turn_context_prompt(system_prompt, MIMI_CONTEXT_BUF_SIZE, &msg);
         ESP_LOGI(TAG, "LLM turn context: channel=%s chat_id=%s", msg.channel, msg.chat_id);
 

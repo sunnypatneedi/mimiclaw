@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
 #include "esp_log.h"
@@ -14,9 +15,15 @@ static const char *TAG = "heartbeat";
 
 #define HEARTBEAT_PROMPT \
     "Read " MIMI_HEARTBEAT_FILE " and follow any instructions or tasks listed there. " \
+    "After completing a task, use edit_file to mark it done (change '- [ ]' to '- [x]'). " \
     "If nothing needs attention, reply with just: HEARTBEAT_OK"
 
 static TimerHandle_t s_heartbeat_timer = NULL;
+
+/* Study hours: 16:00-18:00 local time (matches USER.md study schedule).
+ * During these hours, heartbeat fires more frequently (15 min vs 30 min). */
+#define SCHOOL_HOUR_START 16
+#define SCHOOL_HOUR_END   18
 
 /* ── Content check ────────────────────────────────────────────── */
 
@@ -102,12 +109,29 @@ static bool heartbeat_send(void)
     return true;
 }
 
+/* ── School-hours check ───────────────────────────────────────── */
+
+static bool is_school_hours(void)
+{
+    time_t now = time(NULL);
+    if (now < 100000) return false;  /* clock not set yet */
+    struct tm local;
+    localtime_r(&now, &local);
+    return (local.tm_hour >= SCHOOL_HOUR_START && local.tm_hour < SCHOOL_HOUR_END);
+}
+
 /* ── Timer callback ───────────────────────────────────────────── */
 
 static void heartbeat_timer_callback(TimerHandle_t xTimer)
 {
     (void)xTimer;
     heartbeat_send();
+
+    /* Adjust next interval: shorter during school hours */
+    uint32_t next_ms = is_school_hours()
+        ? MIMI_HEARTBEAT_SCHOOL_INTERVAL_MS
+        : MIMI_HEARTBEAT_INTERVAL_MS;
+    xTimerChangePeriod(s_heartbeat_timer, pdMS_TO_TICKS(next_ms), 0);
 }
 
 /* ── Public API ───────────────────────────────────────────────── */

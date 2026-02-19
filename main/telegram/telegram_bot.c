@@ -262,7 +262,7 @@ static void process_updates(const char *json_str)
             config_screen_toggle();
         }
         char title[48];
-        snprintf(title, sizeof(title), "TG IN %s", chat_id_str);
+        snprintf(title, sizeof(title), "Puddle");
         display_show_message_card(title, text->valuestring);
 
         /* Push to inbound bus */

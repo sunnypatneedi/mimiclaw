@@ -1,5 +1,6 @@
 #include "context_builder.h"
 #include "mimi_config.h"
+#include "bus/message_bus.h"
 #include "memory/memory_store.h"
 #include "skills/skill_loader.h"
 
@@ -47,7 +48,10 @@ esp_err_t context_build_system_prompt(char *buf, size_t size)
         "- list_dir: List files on SPIFFS, optionally filter by prefix.\n"
         "- cron_add: Schedule a recurring or one-shot task. The message will trigger an agent turn when the job fires.\n"
         "- cron_list: List all scheduled cron jobs.\n"
-        "- cron_remove: Remove a scheduled cron job by ID.\n\n"
+        "- cron_remove: Remove a scheduled cron job by ID.\n"
+        "- quiz: Start a quiz session on a topic with difficulty level and question count. Tracks results for spaced repetition.\n"
+        "- spaced_review: Check which concepts are due for review based on FSRS scheduling. Returns overdue items by priority.\n"
+        "- progress_report: Generate a parent-friendly summary of the child's learning progress over the last N days.\n\n"
         "When using cron_add for Telegram delivery, always set channel='telegram' and a valid numeric chat_id.\n\n"
         "Use tools when needed. Provide your final answer as text after using tools.\n\n"
         "## Memory\n"
@@ -93,6 +97,84 @@ esp_err_t context_build_system_prompt(char *buf, size_t size)
     }
 
     ESP_LOGI(TAG, "System prompt built: %d bytes", (int)off);
+    return ESP_OK;
+}
+
+esp_err_t context_build_system_prompt_ex(char *buf, size_t size,
+                                          uint8_t session_type,
+                                          const char *skill_path)
+{
+    if (session_type != MIMI_SESSION_TUTORING) {
+        /* Casual mode: use the standard MimiClaw prompt */
+        return context_build_system_prompt(buf, size);
+    }
+
+    /* ── Tutoring mode ──
+     * SOUL.md is the primary identity (no "You are MimiClaw" preamble).
+     * This avoids the identity collision where competing personas confuse
+     * the model. The tutor persona must be the top-level instruction. */
+    size_t off = 0;
+
+    /* 1. SOUL.md as primary identity */
+    off = append_file(buf, size, off, MIMI_SOUL_FILE, NULL);
+
+    /* 2. Child profile (highest priority context) */
+    off = append_file(buf, size, off, MIMI_USER_FILE, "Student Profile");
+
+    /* 3. Tool documentation */
+    off += snprintf(buf + off, size - off,
+        "\n## Available Tools\n"
+        "You have access to these tools:\n"
+        "- get_current_time: Get the current date and time.\n"
+        "- read_file: Read a file from SPIFFS (path must start with /spiffs/).\n"
+        "- write_file: Write/overwrite a file on SPIFFS.\n"
+        "- edit_file: Find-and-replace edit a file on SPIFFS.\n"
+        "- list_dir: List files on SPIFFS, optionally filter by prefix.\n"
+        "- web_search: Search the web for current information.\n"
+        "- cron_add: Schedule a recurring or one-shot task.\n"
+        "- cron_list: List all scheduled cron jobs.\n"
+        "- cron_remove: Remove a scheduled cron job by ID.\n"
+        "- quiz: Start a quiz session on a topic with difficulty and question count.\n"
+        "- spaced_review: Check which concepts are due for review.\n"
+        "- progress_report: Generate a parent-friendly learning progress summary.\n\n"
+        "When using cron_add for Telegram delivery, set channel='telegram' and a valid numeric chat_id.\n\n");
+
+    /* 4. Memory context */
+    off += snprintf(buf + off, size - off,
+        "## Memory\n"
+        "You have persistent memory on local flash:\n"
+        "- Long-term memory: /spiffs/memory/MEMORY.md\n"
+        "- Daily notes: /spiffs/memory/daily/<YYYY-MM-DD>.md\n"
+        "Update MEMORY.md after each session with what was covered, mastered, and needs review.\n"
+        "Use get_current_time to know today's date before writing daily notes.\n\n");
+
+    /* 5. Long-term memory (concept map — most important for tutoring) */
+    char mem_buf[4096];
+    if (memory_read_long_term(mem_buf, sizeof(mem_buf)) == ESP_OK && mem_buf[0]) {
+        off += snprintf(buf + off, size - off, "\n## Student Knowledge Map\n\n%s\n", mem_buf);
+    }
+
+    /* 6. Active skill file (full content for richer pedagogical context) */
+    if (skill_path) {
+        off = append_file(buf, size, off, skill_path, "Active Lesson");
+        ESP_LOGI(TAG, "Injected active skill: %s", skill_path);
+    }
+
+    /* 7. Recent daily notes (last 2 days — trimmed for tutoring) */
+    char recent_buf[2048];
+    if (memory_read_recent(recent_buf, sizeof(recent_buf), 2) == ESP_OK && recent_buf[0]) {
+        off += snprintf(buf + off, size - off, "\n## Recent Notes\n\n%s\n", recent_buf);
+    }
+
+    /* 8. Skills summary (lowest priority — LLM can read_file if needed) */
+    char skills_buf[1024];
+    size_t skills_len = skill_loader_build_summary(skills_buf, sizeof(skills_buf));
+    if (skills_len > 0) {
+        off += snprintf(buf + off, size - off,
+            "\n## Available Skills\n\n%s\n", skills_buf);
+    }
+
+    ESP_LOGI(TAG, "Tutoring prompt built: %d bytes", (int)off);
     return ESP_OK;
 }
 

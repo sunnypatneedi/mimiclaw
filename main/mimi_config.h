@@ -46,14 +46,14 @@
 #define MIMI_TG_POLL_STACK           (12 * 1024)
 #define MIMI_TG_POLL_PRIO            5
 #define MIMI_TG_POLL_CORE            0
-#define MIMI_TG_CARD_SHOW_MS         3000
+#define MIMI_TG_CARD_SHOW_MS         15000
 #define MIMI_TG_CARD_BODY_SCALE      3
 
 /* Agent Loop */
 #define MIMI_AGENT_STACK             (24 * 1024)
 #define MIMI_AGENT_PRIO              6
 #define MIMI_AGENT_CORE              1
-#define MIMI_AGENT_MAX_HISTORY       20
+#define MIMI_AGENT_MAX_HISTORY       30
 #define MIMI_AGENT_MAX_TOOL_ITER     10
 #define MIMI_MAX_TOOL_CALLS          4
 #define MIMI_AGENT_SEND_WORKING_STATUS 1
@@ -62,7 +62,7 @@
 #define MIMI_TIMEZONE                "PST8PDT,M3.2.0,M11.1.0"
 
 /* LLM */
-#define MIMI_LLM_DEFAULT_MODEL       "claude-opus-4-5"
+#define MIMI_LLM_DEFAULT_MODEL       "claude-haiku-4-5-20251001"
 #define MIMI_LLM_PROVIDER_DEFAULT    "anthropic"
 #define MIMI_LLM_MAX_TOKENS          4096
 #define MIMI_LLM_API_URL             "https://api.anthropic.com/v1/messages"
@@ -86,8 +86,8 @@
 #define MIMI_MEMORY_FILE             "/spiffs/memory/MEMORY.md"
 #define MIMI_SOUL_FILE               "/spiffs/config/SOUL.md"
 #define MIMI_USER_FILE               "/spiffs/config/USER.md"
-#define MIMI_CONTEXT_BUF_SIZE        (16 * 1024)
-#define MIMI_SESSION_MAX_MSGS        20
+#define MIMI_CONTEXT_BUF_SIZE        (24 * 1024)
+#define MIMI_SESSION_MAX_MSGS        30
 
 /* Cron / Heartbeat */
 #define MIMI_CRON_FILE               "/spiffs/cron.json"
@@ -95,6 +95,7 @@
 #define MIMI_CRON_CHECK_INTERVAL_MS  (60 * 1000)
 #define MIMI_HEARTBEAT_FILE          "/spiffs/HEARTBEAT.md"
 #define MIMI_HEARTBEAT_INTERVAL_MS   (30 * 60 * 1000)
+#define MIMI_HEARTBEAT_SCHOOL_INTERVAL_MS (15 * 60 * 1000)
 
 /* Skills */
 #define MIMI_SKILLS_PREFIX           "/spiffs/skills/"

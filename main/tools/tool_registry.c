@@ -3,6 +3,9 @@
 #include "tools/tool_get_time.h"
 #include "tools/tool_files.h"
 #include "tools/tool_cron.h"
+#include "tools/tool_quiz.h"
+#include "tools/tool_spaced_review.h"
+#include "tools/tool_progress_report.h"
 
 #include <string.h>
 #include "esp_log.h"
@@ -10,7 +13,7 @@
 
 static const char *TAG = "tools";
 
-#define MAX_TOOLS 12
+#define MAX_TOOLS 16
 
 static mimi_tool_t s_tools[MAX_TOOLS];
 static int s_tool_count = 0;
@@ -174,6 +177,48 @@ esp_err_t tool_registry_init(void)
         .execute = tool_cron_remove_execute,
     };
     register_tool(&cr);
+
+    /* Register quiz (Puddle EdTech) */
+    mimi_tool_t qz = {
+        .name = "quiz",
+        .description = "Start a quiz session on a topic. Generates questions at the specified difficulty and tracks results in MEMORY.md for spaced repetition.",
+        .input_schema_json =
+            "{\"type\":\"object\","
+            "\"properties\":{"
+            "\"topic\":{\"type\":\"string\",\"description\":\"The concept to quiz on (e.g. 'multiplication-7x', 'fractions-halves')\"},"
+            "\"difficulty\":{\"type\":\"string\",\"description\":\"Question difficulty: 'easy', 'medium', or 'hard'\"},"
+            "\"num_questions\":{\"type\":\"integer\",\"description\":\"Number of questions (1-10, default 3)\"}"
+            "},"
+            "\"required\":[\"topic\"]}",
+        .execute = tool_quiz_execute,
+    };
+    register_tool(&qz);
+
+    /* Register spaced_review (Puddle EdTech) */
+    mimi_tool_t sr = {
+        .name = "spaced_review",
+        .description = "Check which concepts are due for review based on spaced repetition scheduling. Returns overdue items sorted by priority.",
+        .input_schema_json =
+            "{\"type\":\"object\","
+            "\"properties\":{},"
+            "\"required\":[]}",
+        .execute = tool_spaced_review_execute,
+    };
+    register_tool(&sr);
+
+    /* Register progress_report (Puddle EdTech) */
+    mimi_tool_t pr = {
+        .name = "progress_report",
+        .description = "Generate a parent-friendly progress report summarizing the child's learning over the last N days. Includes mastered concepts, areas needing practice, and upcoming reviews.",
+        .input_schema_json =
+            "{\"type\":\"object\","
+            "\"properties\":{"
+            "\"days\":{\"type\":\"integer\",\"description\":\"Number of days to cover (default 7, max 30)\"}"
+            "},"
+            "\"required\":[]}",
+        .execute = tool_progress_report_execute,
+    };
+    register_tool(&pr);
 
     build_tools_json();
 
